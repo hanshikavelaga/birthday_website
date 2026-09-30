@@ -3498,11 +3498,120 @@ function YourVideo({ onNext }) {
 
 
 
+
+/* =========================================================
+   EXPERIENCE AUDIO
+   Dheema  -> Pages 1–5 (loops)
+   Kalyani -> Page 7 video (starts with the video)
+   Aunty   -> Page 8 final "HAPPY BIRTHDAY, AUNTY" reveal
+========================================================= */
+function useExperienceAudio(page, started, finalMusic) {
+  const dheemaRef = React.useRef(null);
+  const kalyaniRef = React.useRef(null);
+  const auntyRef = React.useRef(null);
+
+  useEffect(() => {
+    const dheema = new Audio("/music/dheema.mp3");
+    const kalyani = new Audio("/music/kalyani.mp3");
+    const aunty = new Audio("/music/aunty.mp3");
+
+    dheema.preload = "auto";
+    kalyani.preload = "auto";
+    aunty.preload = "auto";
+
+    dheema.loop = true;
+    kalyani.loop = false;
+    aunty.loop = false;
+
+    dheemaRef.current = dheema;
+    kalyaniRef.current = kalyani;
+    auntyRef.current = aunty;
+
+    return () => {
+      dheema.pause();
+      kalyani.pause();
+      aunty.pause();
+      dheema.currentTime = 0;
+      kalyani.currentTime = 0;
+      aunty.currentTime = 0;
+      dheemaRef.current = null;
+      kalyaniRef.current = null;
+      auntyRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const dheema = dheemaRef.current;
+    const kalyani = kalyaniRef.current;
+    const aunty = auntyRef.current;
+
+    if (!dheema || !kalyani || !aunty) return;
+
+    const stop = (audio) => {
+      audio.pause();
+      audio.currentTime = 0;
+    };
+
+    if (page >= 1 && page <= 5) {
+      stop(kalyani);
+      stop(aunty);
+
+      dheema.loop = true;
+      dheema.volume = 0.55;
+
+      if (started && dheema.paused) {
+        dheema.play().catch(() => {});
+      }
+    }
+
+    if (page === 7) {
+      stop(dheema);
+      stop(aunty);
+
+      kalyani.loop = false;
+      kalyani.volume = 0.62;
+      kalyani.currentTime = 0;
+
+      // Page 7's archive intro is 3.2 seconds, and the video
+      // starts at the same moment as this track.
+      const timer = setTimeout(() => {
+        kalyani.play().catch(() => {});
+      }, 3200);
+
+      return () => clearTimeout(timer);
+    }
+
+    if (page === 8) {
+      stop(dheema);
+      stop(kalyani);
+
+      if (finalMusic) {
+        aunty.loop = false;
+        aunty.volume = 0.72;
+        if (aunty.paused) {
+          aunty.play().catch(() => {});
+        }
+      } else {
+        stop(aunty);
+      }
+    }
+  }, [page, started, finalMusic]);
+
+  return () => {
+    const dheema = dheemaRef.current;
+    if (dheema) {
+      dheema.loop = true;
+      dheema.volume = 0.55;
+      dheema.play().catch(() => {});
+    }
+  };
+}
+
 /* =========================================================
    PAGE 8 — THE BETRAYAL 😂
    Final surprise. Starts almost empty, then EXPLODES.
 ========================================================= */
-function GhostBetrayal({ onReplay }) {
+function GhostBetrayal({ onReplay, onFinalMusic }) {
   const [phase, setPhase] = useState(0);
 
   useEffect(() => {
@@ -3520,6 +3629,12 @@ function GhostBetrayal({ onReplay }) {
 
     return () => timers.forEach(clearTimeout);
   }, []);
+
+  useEffect(() => {
+    if (phase >= 5 && onFinalMusic) {
+      onFinalMusic();
+    }
+  }, [phase, onFinalMusic]);
 
   const tinyGhosts = [
     { cls: 'b-ghost-1', face: 'peek', text: 'Okayyy...' },
@@ -3963,7 +4078,14 @@ function App() {
   const [accepted, setAccepted] = useState(false);
 
   const [page, setPage] = useState(1);
+  const [audioStarted, setAudioStarted] = useState(false);
+  const [finalMusic, setFinalMusic] = useState(false);
 
+  const playExperienceAudio = useExperienceAudio(
+    page,
+    audioStarted,
+    finalMusic
+  );
 
   /* =========================
      PAGE 1 LOADING
@@ -4137,7 +4259,11 @@ function App() {
 
               <button
                 className="accept-button"
-                onClick={() => setAccepted(true)}
+                onClick={() => {
+                  setAccepted(true);
+                  setAudioStarted(true);
+                  playExperienceAudio();
+                }}
               >
                 I ACCEPT MY FATE
               </button>
@@ -4166,7 +4292,11 @@ function App() {
 
             <button
               className="enter-button"
-              onClick={() => setPage(2)}
+              onClick={() => {
+                setAudioStarted(true);
+                playExperienceAudio();
+                setPage(2);
+              }}
             >
               ENTER
             </button>
@@ -4236,7 +4366,16 @@ function App() {
   ========================= */
 
   if (page === 8) {
-    return <GhostBetrayal onReplay={() => setPage(1)} />;
+    return (
+      <GhostBetrayal
+        onReplay={() => {
+          setFinalMusic(false);
+          setAudioStarted(false);
+          setPage(1);
+        }}
+        onFinalMusic={() => setFinalMusic(true)}
+      />
+    );
   }
 
   return null;
